@@ -1,0 +1,2 @@
+C:\Users\Nicki\Documents\GitHub\Nickis-World\launcher\bin\Release\net8.0-windows\win-x64\publish\NickisWorldLauncher.pdb
+C:\Users\Nicki\Documents\GitHub\Nickis-World\launcher\bin\Release\net8.0-windows\win-x64\publish\NickisWorldLauncher.exe
