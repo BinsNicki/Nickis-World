@@ -83,7 +83,7 @@
     "version": "1.0.0",
     "restore": {
       "projectUniqueName": "C:\\Users\\Nicki\\Documents\\GitHub\\Nickis-World\\launcher\\NickisWorldLauncher.csproj",
-      "projectName": "NickisWorldLauncher",
+      "projectName": "Fancy Five",
       "projectPath": "C:\\Users\\Nicki\\Documents\\GitHub\\Nickis-World\\launcher\\NickisWorldLauncher.csproj",
       "packagesPath": "C:\\Users\\Nicki\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\Nicki\\Documents\\GitHub\\Nickis-World\\launcher\\obj\\",
@@ -173,7 +173,7 @@
           "Microsoft.NETCore.App": {
             "privateAssets": "all"
           },
-          "Microsoft.WindowsDesktop.App.WPF": {
+          "Microsoft.WindowsDesktop.App": {
             "privateAssets": "none"
           }
         },
