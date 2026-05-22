@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Fancy Five")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+92f9e9fc24fdfb836ac0609ea7ee426c9a13d124")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+989d82f0c63d57bb2167c79fcfc28835294957c4")]
 [assembly: System.Reflection.AssemblyProductAttribute("Fancy Five")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Fancy Five")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

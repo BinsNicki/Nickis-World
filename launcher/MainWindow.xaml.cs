@@ -135,7 +135,7 @@ namespace NickisWorldLauncher
                 // 1. Grafikmod
                 if (installGrafik)
                 {
-                    await DownloadAndExtract("https://store6.gofile.io/download/web/95212982-8ae9-41d5-802f-906551aafd4e/citizen.zip", config.FiveMPath, "Grafikmod");
+                    await DownloadAndExtract("http://45.145.226.92/nw/citizen.zip", config.FiveMPath, "Grafikmod");
                 }
 
                 // 2. SoundMod
@@ -144,7 +144,7 @@ namespace NickisWorldLauncher
                     string sfxTarget = Path.Combine(config.GTAVPath, "x64", "audio", "sfx");
                     BackupFile(sfxTarget, "RESIDENT.rpf");
                     BackupFile(sfxTarget, "WEAPONS_PLAYER.rpf");
-                    await DownloadAndExtract("https://cold4.gofile.io/download/web/d39e5a51-1c2a-4186-aadc-93984a20eb2c/RESIDENT.zip", sfxTarget, "SoundMod");
+                    await DownloadAndExtract("http://45.145.226.92/nw/RESIDENT.zip", sfxTarget, "SoundMod");
                 }
 
                 // 3. Addons
@@ -153,12 +153,12 @@ namespace NickisWorldLauncher
 
                 if (installSky)
                 {
-                    await DownloadAndExtract("https://store6.gofile.io/download/web/b39d2da8-2678-47f8-b8ef-c59d52ce120c/nw_sky.zip", modsFolder, "Sky Mod");
+                    await DownloadAndExtract("http://45.145.226.92/nw/nw_sky.zip", modsFolder, "Sky Mod");
                 }
                 
                 if (installAurora)
                 {
-                    await DownloadAndExtract("https://store6.gofile.io/download/web/885bcc1c-b802-4e95-926a-29218098c236/nw_aurora.zip", modsFolder, "Aurora Mod");
+                    await DownloadAndExtract("http://45.145.226.92/nw/nw_aurora.zip", modsFolder, "Aurora Mod");
                 }
 
                 await Task.Run(() => {
@@ -186,10 +186,26 @@ namespace NickisWorldLauncher
             StatusText.Text = $"Lade {statusName} herunter...";
             string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
             
-            var response = await _httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-            using (var fs = new FileStream(tempFile, FileMode.Create))
+            // Manche Hoster blockieren Anfragen ohne User-Agent
+            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+
+            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Server antwortet mit Fehler {response.StatusCode}. Der Link ist wahrscheinlich abgelaufen.");
+
+            using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
                 await response.Content.CopyToAsync(fs);
+
+            // Validierung: Ist es wirklich eine ZIP oder nur eine HTML-Fehlerseite?
+            FileInfo fileInfo = new FileInfo(tempFile);
+            if (fileInfo.Length < 1000) // Mod-Dateien sind nie so klein
+            {
+                string content = File.ReadAllText(tempFile);
+                if (content.Contains("<html") || content.Contains("<!DOCTYPE html"))
+                    throw new Exception($"Der Download-Link für {statusName} ist abgelaufen oder ungültig (HTML statt ZIP erhalten).");
+            }
 
             StatusText.Text = $"Installiere {statusName}...";
             await Task.Run(() => ZipFile.ExtractToDirectory(tempFile, targetDir, true));
