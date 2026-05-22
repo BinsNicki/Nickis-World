@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Net.Http;
 using System.IO.Compression;
+using System.Windows.Media.Animation;
 using Forms = System.Windows.Forms;
 
 namespace NickisWorldLauncher
@@ -65,6 +66,17 @@ namespace NickisWorldLauncher
                 this.Hide();
             }
         }
+
+        // Event-Handler für die neue rahmenlose UI
+        private void Window_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed) DragMove();
+        }
+
+        private void BtnExit_Click(object sender, RoutedEventArgs e) => this.Close();
+        
+        private void BtnMinimize_Click(object sender, RoutedEventArgs e) => this.WindowState = WindowState.Minimized;
+        private void BtnHide_Click(object sender, RoutedEventArgs e) => this.Hide();
 
         private void SetupPaths()
         {
