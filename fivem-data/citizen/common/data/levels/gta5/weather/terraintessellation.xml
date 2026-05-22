@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<TerrainTessellationParameters>
+  <PixelsPerVertex value="512" />
+  <WorldTexelUnit value="10.000000" />
+  <NearNoise x="0.000000" y="0.000000" />
+  <FarNoise x="-0.000000" y="0.000000" />
+  <Envelope x="4.000000" y="5.000000" z="100.000000" w="120.000000" />
+  <UseNearWEnd value="80.000000" />
+</TerrainTessellationParameters>
