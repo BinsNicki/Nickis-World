@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("NickisWorldLauncher")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f1f63757d19667af10176f6e02eac03445ba6362")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+04548dc9406b143cb25284016d968f1ee812aed2")]
 [assembly: System.Reflection.AssemblyProductAttribute("NickisWorldLauncher")]
 [assembly: System.Reflection.AssemblyTitleAttribute("NickisWorldLauncher")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
