@@ -2,10 +2,13 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Diagnostics;
+using System.Threading;
 using Microsoft.Win32;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Text.Json;
+using System.Net.Http;
+using System.IO.Compression;
 using Forms = System.Windows.Forms;
 
 namespace NickisWorldLauncher
@@ -20,7 +23,9 @@ namespace NickisWorldLauncher
 
     public partial class MainWindow : Window
     {
-        private string modSource = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "fivem-data");
+        private static readonly HttpClient _httpClient = new HttpClient();
+        private static Mutex? _mutex;
+
         private string versionFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "version.md");
         private string appName = "Fancy Five";
         
@@ -31,6 +36,15 @@ namespace NickisWorldLauncher
 
         public MainWindow()
         {
+            // Sicherstellen, dass nur eine Instanz läuft
+            _mutex = new Mutex(true, "FancyFiveLauncherMutex", out bool createdNew);
+            if (!createdNew)
+            {
+                System.Windows.MessageBox.Show("Der Launcher läuft bereits im Hintergrund!", "Information");
+                System.Windows.Application.Current.Shutdown();
+                return;
+            }
+
             InitializeComponent();
             configPath = Path.Combine(configDir, "config.json");
             
@@ -100,45 +114,54 @@ namespace NickisWorldLauncher
         private async void BtnInstall_Click(object sender, RoutedEventArgs e)
         {
             try {
-                StatusText.Text = "Installiere Dateien...";
+                if (IsGameRunning())
+                {
+                    System.Windows.MessageBox.Show("Bitte schließe FiveM und GTA V, bevor du Mods installierst!", "Prozess gefunden", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
                 InstallProgress.Visibility = Visibility.Visible;
                 InstallProgress.IsIndeterminate = true;
 
+                if (string.IsNullOrEmpty(config.FiveMPath) || !Directory.Exists(config.FiveMPath)) throw new Exception("FiveM Pfad ist ungültig!");
+                if (string.IsNullOrEmpty(config.GTAVPath) || !Directory.Exists(config.GTAVPath)) throw new Exception("GTA V Pfad ist ungültig!");
+
+                // Zustände auf dem UI-Thread erfassen
+                bool installGrafik = CheckGrafik.IsChecked == true;
+                bool installSound = CheckSound.IsChecked == true;
+                bool installSky = CheckSky.IsChecked == true;
+                bool installAurora = CheckAurora.IsChecked == true;
+
+                // 1. Grafikmod
+                if (installGrafik)
+                {
+                    await DownloadAndExtract("https://store6.gofile.io/download/web/95212982-8ae9-41d5-802f-906551aafd4e/citizen.zip", config.FiveMPath, "Grafikmod");
+                }
+
+                // 2. SoundMod
+                if (installSound)
+                {
+                    string sfxTarget = Path.Combine(config.GTAVPath, "x64", "audio", "sfx");
+                    BackupFile(sfxTarget, "RESIDENT.rpf");
+                    BackupFile(sfxTarget, "WEAPONS_PLAYER.rpf");
+                    await DownloadAndExtract("https://cold4.gofile.io/download/web/d39e5a51-1c2a-4186-aadc-93984a20eb2c/RESIDENT.zip", sfxTarget, "SoundMod");
+                }
+
+                // 3. Addons
+                string modsFolder = Path.Combine(config.FiveMPath, "mods");
+                if (!Directory.Exists(modsFolder)) Directory.CreateDirectory(modsFolder);
+
+                if (installSky)
+                {
+                    await DownloadAndExtract("https://store6.gofile.io/download/web/b39d2da8-2678-47f8-b8ef-c59d52ce120c/nw_sky.zip", modsFolder, "Sky Mod");
+                }
+                
+                if (installAurora)
+                {
+                    await DownloadAndExtract("https://store6.gofile.io/download/web/885bcc1c-b802-4e95-926a-29218098c236/nw_aurora.zip", modsFolder, "Aurora Mod");
+                }
+
                 await Task.Run(() => {
-                    if (string.IsNullOrEmpty(config.FiveMPath) || !Directory.Exists(config.FiveMPath)) throw new Exception("FiveM Pfad ist ungültig oder nicht gesetzt!");
-                    if (string.IsNullOrEmpty(config.GTAVPath) || !Directory.Exists(config.GTAVPath)) throw new Exception("GTA V Pfad ist ungültig oder nicht gesetzt!");
-                    
-                    // 1. Grafikmod
-                    if (CheckGrafik.Dispatcher.Invoke(() => CheckGrafik.IsChecked == true))
-                    {
-                        string source = Path.Combine(modSource, "citizen");
-                        if (Directory.Exists(source)) CopyDirectory(source, Path.Combine(config.FiveMPath, "citizen"));
-                    }
-
-                    // 2. SoundMod
-                    if (CheckSound.Dispatcher.Invoke(() => CheckSound.IsChecked == true))
-                    {
-                        string soundSource = Path.Combine(modSource, "sound");
-                        string sfxTarget = Path.Combine(config.GTAVPath, "x64", "audio", "sfx");
-                        if (Directory.Exists(soundSource) && Directory.Exists(sfxTarget))
-                        {
-                            BackupFile(sfxTarget, "RESIDENT.rpf");
-                            BackupFile(sfxTarget, "WEAPONS_PLAYER.rpf");
-                            foreach (string file in Directory.GetFiles(soundSource, "*.rpf"))
-                                File.Copy(file, Path.Combine(sfxTarget, Path.GetFileName(file)), true);
-                        }
-                    }
-
-                    // 3. Addons (Sky & Aurora)
-                    string modsFolder = Path.Combine(config.FiveMPath, "mods");
-                    Directory.CreateDirectory(modsFolder);
-
-                    if (CheckSky.Dispatcher.Invoke(() => CheckSky.IsChecked == true))
-                        InstallAddon("nw_sky.rpf", modsFolder);
-                    
-                    if (CheckAurora.Dispatcher.Invoke(() => CheckAurora.IsChecked == true))
-                        InstallAddon("nw_aurora.rpf", modsFolder);
-
                     // Config aktualisieren
                     config.InstalledVersion = File.Exists(versionFile) ? File.ReadAllText(versionFile).Trim() : "1.0.0";
                     config.LastUpdate = DateTime.Now;
@@ -158,30 +181,57 @@ namespace NickisWorldLauncher
             }
         }
 
-        private void InstallAddon(string fileName, string targetFolder)
+        private async Task DownloadAndExtract(string url, string targetDir, string statusName)
         {
-            string sourceFile = Path.Combine(modSource, "mods", fileName);
-            if (File.Exists(sourceFile))
-                File.Copy(sourceFile, Path.Combine(targetFolder, fileName), true);
+            StatusText.Text = $"Lade {statusName} herunter...";
+            string tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".zip");
+            
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            using (var fs = new FileStream(tempFile, FileMode.Create))
+                await response.Content.CopyToAsync(fs);
+
+            StatusText.Text = $"Installiere {statusName}...";
+            await Task.Run(() => ZipFile.ExtractToDirectory(tempFile, targetDir, true));
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+
+        private bool IsGameRunning()
+        {
+            return Process.GetProcessesByName("FiveM").Any() || 
+                   Process.GetProcessesByName("GTA5").Any() || 
+                   Process.GetProcessesByName("FiveM_ChromeBrowser").Any();
         }
 
         private async void BtnUninstall_Click(object sender, RoutedEventArgs e)
         {
             try {
+                if (IsGameRunning())
+                {
+                    System.Windows.MessageBox.Show("Bitte schließe FiveM und GTA V, bevor du Mods entfernst!", "Prozess gefunden", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
                 StatusText.Text = "Deinstalliere Komponenten...";
                 InstallProgress.Visibility = Visibility.Visible;
                 InstallProgress.IsIndeterminate = true;
 
+                // Zustände auf dem UI-Thread erfassen, bevor der Hintergrund-Task startet
+                bool uninstallGrafik = CheckGrafik.IsChecked == true;
+                bool uninstallSound = CheckSound.IsChecked == true;
+                bool uninstallSky = CheckSky.IsChecked == true;
+                bool uninstallAurora = CheckAurora.IsChecked == true;
+
                 await Task.Run(() => {
                     // Grafikmod entfernen
-                    if (CheckGrafik.Dispatcher.Invoke(() => CheckGrafik.IsChecked == true))
+                    if (uninstallGrafik)
                     {
                         string target = Path.Combine(config.FiveMPath, "citizen");
                         if (Directory.Exists(target)) Directory.Delete(target, true);
                     }
 
                     // SoundMod entfernen & Backup wiederherstellen
-                    if (CheckSound.Dispatcher.Invoke(() => CheckSound.IsChecked == true))
+                    if (uninstallSound)
                     {
                         string sfxTarget = Path.Combine(config.GTAVPath, "x64", "audio", "sfx");
                         RestoreFile(sfxTarget, "RESIDENT.rpf");
@@ -189,10 +239,10 @@ namespace NickisWorldLauncher
                     }
 
                     // Addons entfernen
-                    if (CheckSky.Dispatcher.Invoke(() => CheckSky.IsChecked == true))
+                    if (uninstallSky)
                         DeleteFile(Path.Combine(config.FiveMPath, "mods", "nw_sky.rpf"));
 
-                    if (CheckAurora.Dispatcher.Invoke(() => CheckAurora.IsChecked == true))
+                    if (uninstallAurora)
                         DeleteFile(Path.Combine(config.FiveMPath, "mods", "nw_aurora.rpf"));
                 });
 
@@ -232,16 +282,7 @@ namespace NickisWorldLauncher
                 File.Copy(filePath, backupPath);
             }
         }
-
-        private void CopyDirectory(string sourceDir, string targetDir)
-        {
-            Directory.CreateDirectory(targetDir);
-            foreach (var file in Directory.GetFiles(sourceDir))
-                File.Copy(file, Path.Combine(targetDir, Path.GetFileName(file)), true);
-            foreach (var directory in Directory.GetDirectories(sourceDir))
-                CopyDirectory(directory, Path.Combine(targetDir, Path.GetFileName(directory)));
-        }
-
+        
         private void BtnCheckUpdates_Click(object sender, RoutedEventArgs e)
         {
             // Hier würdest du normalerweise eine URL abrufen (z.B. von GitHub)
